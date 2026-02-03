@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 1. FORCE BLACK BACKGROUND GLOBALLY */
+body {
+  background-color: #000000;
+  color: #ffffff;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 2. REMOVE DEFAULT BLUE OUTLINES ON INPUTS */
+input, select, textarea, button {
+  outline: none;
+}
+
+/* 3. CUSTOM DARK SCROLLBAR (Chrome/Edge/Safari) */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000000; 
+}
+
+::-webkit-scrollbar-thumb {
+  background: #262626; /* Dark Gray Thumb */
+  border-radius: 5px;
+  border: 2px solid #000000; /* Spacing effect */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #404040; /* Lighter on hover */
+}
+
+/* 4. UTILITY: Hide Scrollbar but keep functionality */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* --- FIX LEAFLET MAP SEARCH BAR COLORS --- */
+
+/* Force the input text to be black so it's visible on white background */
+.leaflet-control-geosearch form input {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #ccc !important;
+}
+
+/* Force the search result list text to be black */
+.leaflet-control-geosearch .results > * {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+}
+
+/* Fix hover state on results */
+.leaflet-control-geosearch .results > .active,
+.leaflet-control-geosearch .results > :hover {
+    background-color: #f0f0f0 !important;
+}
