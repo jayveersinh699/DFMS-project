@@ -3,15 +3,13 @@ import { BrowserRouter as Router } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast'; 
 import Navbar from './components/Navbar';
 import LoginModal from './components/LoginModal';
-import AnimatedRoutes from './AnimatedRoutes'; // Import the new routes
+import AnimatedRoutes from './AnimatedRoutes'; 
 
 function App() {
   const [user, setUser] = useState(null); 
   const [showLogin, setShowLogin] = useState(false);
   const [openRegister, setOpenRegister] = useState(false); 
   const [cars, setCars] = useState([]);
-  
-  // Remembers where the user wanted to go before logging in
   const [redirectPath, setRedirectPath] = useState(null);
 
   useEffect(() => {
@@ -32,8 +30,12 @@ function App() {
     setShowLogin(true);
   };
 
+  // --- UPDATED SECURE LOGIN FUNCTION ---
   const handleLogin = async (userData) => {
     const toastId = toast.loading('Processing...');
+
+    // We no longer check for 'admin123' here. 
+    // We send the data to the backend, and IT tells us if we are admin.
     const endpoint = userData.isRegister ? 'register' : 'login';
     
     try {
@@ -45,13 +47,17 @@ function App() {
       const data = await response.json();
 
       if (response.ok) {
-        toast.success(`Welcome ${data.user.name}`, { id: toastId });
+        toast.success(data.message || `Welcome ${data.user.name}`, { id: toastId });
+        
         setUser(data.user);
         localStorage.setItem('dfms_user', JSON.stringify(data.user)); 
         setShowLogin(false);
         
-        // SMART REDIRECT LOGIC
-        if (redirectPath && data.user.role === 'renter') {
+        // CHECK ROLE FROM BACKEND RESPONSE
+        if (data.user.role === 'admin') {
+            window.location.href = '/admin'; // Redirects Admin
+        } 
+        else if (redirectPath && data.user.role === 'renter') {
            window.location.href = redirectPath; 
            setRedirectPath(null);
         } else {
@@ -62,7 +68,7 @@ function App() {
         toast.error(data.message, { id: toastId });
       }
     } catch (error) {
-      toast.error('Backend not running', { id: toastId });
+      toast.error('Server unavailable', { id: toastId });
     }
   };
 
@@ -85,7 +91,6 @@ function App() {
       <Toaster position="top-center" toastOptions={{ style: { background: '#121212', color: '#fff' } }} />
       <Navbar user={user} onAuthClick={handleAuthClick} onLogout={handleLogout} />
       
-      {/* THE NEW ANIMATED ROUTING SYSTEM */}
       <AnimatedRoutes 
         user={user} 
         cars={cars} 

@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const Booking = require('../models/Booking');
-const Car = require('../models/Car'); 
+const Car = require('../models/Car'); // Import Car model for validation
 
-// CREATE REQUEST
+// 1. CREATE REQUEST (Secure Version - Uses Your Math Logic)
 router.post('/request', async (req, res) => {
   try {
     const { carId, dates, distanceKm } = req.body;
@@ -12,7 +12,7 @@ router.post('/request', async (req, res) => {
     const car = await Car.findById(carId);
     if (!car) return res.status(404).json({ message: "Car not found" });
 
-    // Calculate Price
+    // Calculate Price on Server (Secure)
     const start = new Date(dates.start);
     const end = new Date(dates.end);
     const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
@@ -25,41 +25,49 @@ router.post('/request', async (req, res) => {
     // Save to Database
     const newBooking = new Booking({
       ...req.body,
-      totalPrice: truePrice,
-      status: 'pending' // Ensures it shows up as a request
+      totalPrice: truePrice, // Overwrite frontend price with secure server price
+      status: 'pending'
     });
     
     const savedBooking = await newBooking.save();
-    console.log("New Booking Saved:", savedBooking); // Check backend terminal for this!
-    
     res.status(201).json(savedBooking);
 
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET OWNER REQUESTS
-router.get('/owner/:ownerId', async (req, res) => {
+// 2. SMART FETCH (Combined Renter & Owner - Required for Dashboard)
+router.get('/:userId', async (req, res) => {
   try {
-    const requests = await Booking.find({ ownerId: req.params.ownerId }).sort({ createdAt: -1 });
-    res.json(requests);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    const bookings = await Booking.find({
+      $or: [
+        { renterId: req.params.userId },
+        { ownerId: req.params.userId }
+      ]
+    }).sort({ _id: -1 });
+    
+    res.json(bookings);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// GET RENTER HISTORY
-router.get('/renter/:renterId', async (req, res) => {
-  const trips = await Booking.find({ renterId: req.params.renterId }).sort({ createdAt: -1 });
-  res.json(trips);
+// 3. UPDATE STATUS (Accept/Reject Logic)
+router.put('/:id/status', async (req, res) => {
+    try {
+        const { status } = req.body;
+        const updatedBooking = await Booking.findByIdAndUpdate(
+            req.params.id, 
+            { status }, 
+            { new: true }
+        );
+        res.json(updatedBooking);
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// UPDATE STATUS
-router.put('/:id', async (req, res) => {
-  const booking = await Booking.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
-  res.json(booking);
+// 4. ADMIN ROUTE
+router.get('/all', async (req, res) => {
+    const bookings = await Booking.find();
+    res.json(bookings);
 });
 
 module.exports = router;
