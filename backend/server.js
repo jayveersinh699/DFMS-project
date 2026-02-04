@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-
+                 // <--- ADD THIS
 const app = express();
 app.use(express.json());
 app.use(cors());
@@ -28,3 +28,5 @@ app.use('/api/bookings/all', async (req, res) => {
 });
 
 app.listen(5000, () => console.log('Server running on port 5000'));
+const chatRoutes = require('./routes/chatRoutes'); // <--- ADD THIS
+app.use('/api/chat', chatRoutes);                  // <--- ADD THIS

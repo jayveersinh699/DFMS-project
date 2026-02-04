@@ -1,18 +1,26 @@
 const express = require('express');
 const router = express.Router();
 const Booking = require('../models/Booking');
-const Car = require('../models/Car'); // Import Car model for validation
+const Car = require('../models/Car');
 
-// 1. CREATE REQUEST (Secure Version - Uses Your Math Logic)
+// 1. ADMIN ROUTE (Must be first)
+router.get('/all', async (req, res) => {
+    try {
+        const bookings = await Booking.find().sort({ createdAt: -1 });
+        res.json(bookings);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 2. CREATE REQUEST (The Fix is Here)
 router.post('/request', async (req, res) => {
   try {
     const { carId, dates, distanceKm } = req.body;
     
-    // Validate Car exists
+    // A. Find the Car to get the Real Owner
     const car = await Car.findById(carId);
     if (!car) return res.status(404).json({ message: "Car not found" });
 
-    // Calculate Price on Server (Secure)
+    // B. Calculate Price
     const start = new Date(dates.start);
     const end = new Date(dates.end);
     const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
@@ -22,10 +30,13 @@ router.post('/request', async (req, res) => {
     const companyCost = (distanceKm || 0) * (car.pricePerKm || 10);
     const truePrice = driverCost + companyCost; 
 
-    // Save to Database
+    // C. Create Booking with OWNER ID attached
     const newBooking = new Booking({
       ...req.body,
-      totalPrice: truePrice, // Overwrite frontend price with secure server price
+      ownerId: car.ownerId, // <--- CRITICAL FIX: Links request to Driver
+      ownerName: car.ownerName,
+      carName: `${car.brand} ${car.name}`,
+      totalPrice: truePrice,
       status: 'pending'
     });
     
@@ -37,13 +48,13 @@ router.post('/request', async (req, res) => {
   }
 });
 
-// 2. SMART FETCH (Combined Renter & Owner - Required for Dashboard)
+// 3. GET USER/DRIVER BOOKINGS
 router.get('/:userId', async (req, res) => {
   try {
     const bookings = await Booking.find({
       $or: [
         { renterId: req.params.userId },
-        { ownerId: req.params.userId }
+        { ownerId: req.params.userId } // This will now work because we saved it above
       ]
     }).sort({ _id: -1 });
     
@@ -51,7 +62,7 @@ router.get('/:userId', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 3. UPDATE STATUS (Accept/Reject Logic)
+// 4. UPDATE STATUS
 router.put('/:id/status', async (req, res) => {
     try {
         const { status } = req.body;
@@ -62,12 +73,6 @@ router.put('/:id/status', async (req, res) => {
         );
         res.json(updatedBooking);
     } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// 4. ADMIN ROUTE
-router.get('/all', async (req, res) => {
-    const bookings = await Booking.find();
-    res.json(bookings);
 });
 
 module.exports = router;

@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock } from 'lucide-react';
+import { Calendar, MapPin, MessageCircle, XCircle } from 'lucide-react';
+import TripChat from '../components/TripChat'; // Make sure you created this file!
 
 export default function RenterDashboard({ user }) {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeChat, setActiveChat] = useState(null); // Stores the Booking ID of open chat
 
   useEffect(() => {
     const fetchTrips = async () => {
       if(!user?._id) return;
       try {
-        // Use the new Smart Route
+        // Use the Smart Route we made earlier
         const res = await fetch(`http://localhost:5000/api/bookings/${user._id}`);
         const data = await res.json();
         
@@ -29,7 +31,7 @@ export default function RenterDashboard({ user }) {
       <div className="max-w-4xl mx-auto px-6">
         
         <h1 className="text-4xl font-bold mb-2">My Journeys</h1>
-        <p className="text-gray-400 mb-10">Track the status of your requested rides.</p>
+        <p className="text-gray-400 mb-10">Track your rides and chat with drivers.</p>
 
         {trips.length === 0 ? (
            <div className="text-center py-20 bg-dark rounded-xl border border-white/10">
@@ -39,7 +41,7 @@ export default function RenterDashboard({ user }) {
         ) : (
           <div className="space-y-6">
             {trips.map(trip => (
-              <div key={trip._id} className="bg-dark p-6 rounded-xl border border-white/10 relative overflow-hidden group hover:border-white/30 transition">
+              <div key={trip._id} className="bg-dark p-6 rounded-xl border border-white/10 relative overflow-hidden transition hover:border-white/30">
                 
                 {/* STATUS BADGE */}
                 <div className={`absolute top-0 right-0 px-4 py-1.5 text-xs font-bold uppercase tracking-wide
@@ -66,6 +68,16 @@ export default function RenterDashboard({ user }) {
                             {trip.distanceKm} km trip
                          </div>
                       </div>
+
+                      {/* CHAT BUTTON (Only shows if Confirmed) */}
+                      {trip.status === 'confirmed' && (
+                        <button 
+                            onClick={() => setActiveChat(trip._id)}
+                            className="mt-6 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition"
+                        >
+                            <MessageCircle size={18} /> Chat with Driver
+                        </button>
+                      )}
                    </div>
 
                    {/* PRICE INFO */}
@@ -75,10 +87,10 @@ export default function RenterDashboard({ user }) {
                    </div>
                 </div>
 
-                {/* REJECTION MESSAGE (Optional) */}
+                {/* REJECTION MESSAGE */}
                 {trip.status === 'rejected' && (
                     <div className="mt-4 bg-red-500/10 p-3 rounded-lg border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
-                        <XCircleIcon /> The driver was unavailable for these dates. The amount will be refunded to your wallet shortly.
+                        <XCircle size={16} /> Driver unavailable. Refund initiated.
                     </div>
                 )}
 
@@ -86,15 +98,17 @@ export default function RenterDashboard({ user }) {
             ))}
           </div>
         )}
+        
+        {/* CHAT MODAL POPUP */}
+        {activeChat && (
+            <TripChat 
+                bookingId={activeChat} 
+                currentUser={user} 
+                onClose={() => setActiveChat(null)} 
+            />
+        )}
 
       </div>
     </div>
   );
-}
-
-// Simple Icon Component for the Rejection Message
-function XCircleIcon() {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-    )
 }
