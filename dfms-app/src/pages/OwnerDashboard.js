@@ -7,7 +7,28 @@ export default function OwnerDashboard({ user, cars, addCar }) {
   const [activeTab, setActiveTab] = useState('fleet');
   const [requests, setRequests] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
-  
+  const [qrCode, setQrCode] = useState(user?.qrCode || null);
+
+  const handleQrUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('qrCode', file);
+
+    const toastId = toast.loading("Uploading QR Code...");
+    try {
+      const res = await fetch(`http://localhost:5000/api/auth/update-qr/${user._id}`, {
+        method: 'PUT',
+        body: formData
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setQrCode(data.qrCode);
+        toast.success("QR Code saved!", { id: toastId });
+      }
+    } catch (e) { toast.error("Upload failed", { id: toastId }); }
+  };
   // NEW: State for image preview
   const [imagePreview, setImagePreview] = useState(null);
   
@@ -156,7 +177,20 @@ export default function OwnerDashboard({ user, cars, addCar }) {
                   <button className="w-full bg-white text-black font-bold py-4 rounded-lg hover:bg-gray-200 transition">List Vehicle</button>
                 </form>
             </div>
-
+<div className="bg-zinc-900 p-8 rounded-xl border border-white/10">
+                   <h2 className="text-xl font-bold mb-4">Payment QR Code</h2>
+                   <p className="text-gray-400 text-sm mb-4">Upload your UPI QR code so renters can pay you directly via the platform.</p>
+                   <div className="flex items-center gap-6">
+                      <div className="w-32 h-32 bg-black border border-white/10 rounded-lg flex items-center justify-center overflow-hidden">
+                        {qrCode ? <img src={qrCode} className="w-full h-full object-contain" /> : <span className="text-xs text-gray-500">No QR</span>}
+                      </div>
+                      <input type="file" id="qrInput" hidden onChange={handleQrUpload} />
+                      <button onClick={() => document.getElementById('qrInput').click()} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg font-bold transition">
+                        Change QR
+                      </button>
+                   </div>
+                </div>
+        
             <div className="space-y-4">
                 <h2 className="text-2xl font-bold mb-4">Your Active Vehicles</h2>
                 {cars.filter(c => String(c.ownerId) === String(user._id)).map(car => (

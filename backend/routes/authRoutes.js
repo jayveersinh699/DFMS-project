@@ -1,7 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-
+const multer = require('multer');
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, 'uploads/'),
+  filename: (req, file, cb) => cb(null, 'qr-' + Date.now() + '-' + file.originalname),
+});
+const upload = multer({ storage });
 // REGISTER
 router.post('/register', async (req, res) => {
   try {
@@ -21,6 +26,7 @@ router.post('/register', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // LOGIN (NOW WITH STRICT ROLE CHECK)
 router.post('/login', async (req, res) => {
@@ -56,6 +62,13 @@ router.post('/login', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+router.put('/update-qr/:id', upload.single('qrCode'), async (req, res) => {
+    try {
+        const qrUrl = `http://localhost:5000/uploads/${req.file.filename}`;
+        const user = await User.findByIdAndUpdate(req.params.id, { qrCode: qrUrl }, { new: true });
+        res.json({ message: "QR Code Updated", qrCode: user.qrCode });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 module.exports = router;

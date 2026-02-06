@@ -7,7 +7,9 @@ const UserSchema = new mongoose.Schema({
   role: { type: String, enum: ['owner', 'renter'], default: 'renter' },
   phone: { type: String },
   license: { type: String },
+  qrCode: { type: String },
   createdAt: { type: Date, default: Date.now }
+  
 });
 
 module.exports = mongoose.model('User', UserSchema);
