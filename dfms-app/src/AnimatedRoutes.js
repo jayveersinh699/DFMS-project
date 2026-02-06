@@ -10,6 +10,7 @@ import RenterMarketplace from './pages/RenterMarketplace';
 import Checkout from './pages/Checkout';
 import RenterDashboard from './pages/RenterDashboard';
 import AdminDashboard from './pages/AdminDashboard'; // NEW IMPORT
+import PaymentOptions from './pages/PaymentOptions';
 
 export default function AnimatedRoutes({ user, cars, addCar, handleAuthClick, setRedirectPath }) {
   const location = useLocation();
@@ -17,6 +18,7 @@ export default function AnimatedRoutes({ user, cars, addCar, handleAuthClick, se
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
+        <Route path="/payment" element={<PaymentOptions />} />
         
         <Route 
           path="/" 

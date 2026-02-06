@@ -2,28 +2,24 @@ const mongoose = require('mongoose');
 
 const bookingSchema = new mongoose.Schema({
   carId: { type: mongoose.Schema.Types.ObjectId, ref: 'Car' },
-  carName: String, // Store snapshot of name in case car is deleted later
-  renterId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  
-  // DATES
-  dates: {
-    start: String,
-    end: String
-  },
-
-  // TRIP DETAILS (This was likely missing!)
-  distanceKm: { type: Number, default: 0 }, 
-  
-  // MONEY
+  carName: String,
+  renterId: { type: String, required: true },
+  ownerId: { type: String, required: true },
+  dates: { start: String, end: String },
+  distanceKm: Number,
   totalPrice: Number,
-
-  // STATUS
   status: { 
     type: String, 
-    enum: ['pending', 'confirmed', 'rejected', 'completed'],
+    enum: ['pending', 'confirmed', 'rejected', 'ongoing', 'completed'], 
     default: 'pending' 
-  }
-}, { timestamps: true });
+  },
+  paymentStatus: { 
+    type: String, 
+    enum: ['unpaid', 'escrow', 'paid_to_driver'], 
+    default: 'unpaid' 
+  },
+  otp: { type: String }, // Used for trip completion handshake
+  createdAt: { type: Date, default: Date.now }
+});
 
 module.exports = mongoose.model('Booking', bookingSchema);

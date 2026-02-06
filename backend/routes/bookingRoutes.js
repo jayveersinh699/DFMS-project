@@ -74,5 +74,36 @@ router.put('/:id/status', async (req, res) => {
         res.json(updatedBooking);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+// ... after existing routes
+
+// DRIVER: Start Trip (Generates OTP for the Renter)
+router.put('/:id/start', async (req, res) => {
+    try {
+        const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        const updated = await Booking.findByIdAndUpdate(
+            req.params.id, 
+            { status: 'ongoing', otp: generatedOtp }, 
+            { new: true }
+        );
+        res.json(updated);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DRIVER: Verify OTP and Complete Trip (Releases Funds)
+router.put('/:id/complete', async (req, res) => {
+    try {
+        const { otp } = req.body;
+        const booking = await Booking.findById(req.params.id);
+        
+        if (booking.otp === otp) {
+            booking.status = 'completed';
+            booking.paymentStatus = 'paid_to_driver'; // Platform pays driver now
+            await booking.save();
+            res.json({ message: "Success! Trip completed and payment released.", booking });
+        } else {
+            res.status(400).json({ message: "Invalid OTP. Please check with the renter." });
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 module.exports = router;

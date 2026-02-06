@@ -37,41 +37,36 @@ export default function Checkout({ cars, user }) {
   // MAP STATE
   const [pickup, setPickup] = useState(null);
   const [dropoff, setDropoff] = useState(null);
-  const [routePath, setRoutePath] = useState([]); // Stores the road geometry
+  const [routePath, setRoutePath] = useState([]); 
   const [distanceKm, setDistanceKm] = useState(0);
   const [addressNames, setAddressNames] = useState({ pickup: '', dropoff: '' });
 
-  const [card, setCard] = useState({ number: '', expiry: '', cvv: '', name: '' });
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
 
-  // 1. REVERSE GEOCODING (Get Address Name from Coords)
   const getAddressName = async (lat, lng, type) => {
     try {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
         const data = await res.json();
-        const name = data.display_name.split(',')[0] + ', ' + data.display_name.split(',')[1]; // Shorten it
+        const name = data.display_name.split(',')[0] + ', ' + data.display_name.split(',')[1];
         setAddressNames(prev => ({ ...prev, [type]: name }));
     } catch(e) { console.error("Address Error"); }
   };
 
-  // 2. REAL ROUTING (Get Driving Path & Distance)
   useEffect(() => {
       if(pickup && dropoff) {
           setIsLoadingRoute(true);
           const fetchRoute = async () => {
               try {
-                  // OSRM Public API (Free)
                   const url = `https://router.project-osrm.org/route/v1/driving/${pickup.lng},${pickup.lat};${dropoff.lng},${dropoff.lat}?overview=full&geometries=geojson`;
                   const res = await fetch(url);
                   const data = await res.json();
 
                   if(data.routes && data.routes.length > 0) {
                       const route = data.routes[0];
-                      // Swap Coords for Leaflet [lat, lng]
                       const coordinates = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
                       setRoutePath(coordinates);
-                      setDistanceKm((route.distance / 1000).toFixed(1)); // Convert meters to KM
+                      setDistanceKm((route.distance / 1000).toFixed(1));
                   }
               } catch(e) { console.error("Routing Error"); }
               setIsLoadingRoute(false);
@@ -80,7 +75,6 @@ export default function Checkout({ cars, user }) {
       }
   }, [pickup, dropoff]);
   
-  // CLICK HANDLER
   function LocationMarker() {
     useMapEvents({
       click(e) {
@@ -91,7 +85,6 @@ export default function Checkout({ cars, user }) {
             setDropoff(e.latlng);
             getAddressName(e.latlng.lat, e.latlng.lng, 'dropoff');
         } else {
-            // Reset if clicked a 3rd time
             setPickup(e.latlng);
             setDropoff(null);
             setRoutePath([]);
@@ -113,46 +106,44 @@ export default function Checkout({ cars, user }) {
     return days > 0 ? days : 1; 
   }
 
+  // --- UPDATED PRICE CALCULATION WITH DISCOUNTS ---
   const days = calculateDays();
-  const driverCost = days * car.price;
+  const baseDriverCost = days * car.price;
+
+  let discountPercentage = 0;
+  if (days >= 8) {
+    discountPercentage = 0.10; // 10% off for 8+ days
+  } else if (days >= 4) {
+    discountPercentage = 0.05; // 5% off for 4-7 days
+  }
+
+  const discountAmount = Math.floor(baseDriverCost * discountPercentage);
+  const driverCost = baseDriverCost - discountAmount;
   const companyCost = distanceKm * (car.pricePerKm || 10);
   const totalCost = driverCost + companyCost;
 
-  const handleConfirm = async () => {
-    if(!days) return alert("Please select Start and End dates");
-    if(!distanceKm) return alert("Please click the map to set Pickup and Dropoff points");
+  const handleConfirm = () => {
+    if(!days) return alert("Please select dates");
+    if(!distanceKm) return alert("Please select route on map");
     
-    setIsProcessing(true);
+    const bookingData = {
+        carId: car._id, 
+        carName: car.brand + " " + car.name, 
+        renterId: user._id, 
+        ownerId: car.ownerId,
+        dates, 
+        distanceKm, 
+        totalPrice: Math.floor(totalCost)
+    };
 
-    setTimeout(async () => {
-        const bookingData = {
-          carId: car._id, carName: car.name, renterId: user._id, ownerId: car.ownerId,
-          dates, distanceKm, totalPrice: totalCost, status: 'pending'
-        };
-
-        try {
-          const res = await fetch('http://localhost:5000/api/bookings/request', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(bookingData)
-          });
-          
-          if(res.ok) {
-            alert("Payment Successful! Ride Requested.");
-            navigate('/renter/trips');
-          } else {
-            alert("Booking Failed.");
-            setIsProcessing(false);
-          }
-        } catch (err) { alert("Server Error"); setIsProcessing(false); }
-    }, 2000);
+    navigate('/payment', { state: bookingData });
   };
 
   return (
     <div className="bg-black min-h-screen text-white pt-10 pb-20">
       <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12">
         
-        {/* LEFT: MAP (Interactive) */}
+        {/* LEFT: MAP */}
         <div className="space-y-6">
            <div>
                <h1 className="text-3xl font-bold">{car.brand} {car.name}</h1>
@@ -164,42 +155,21 @@ export default function Checkout({ cars, user }) {
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
                 <SearchField />
                 <LocationMarker />
-                
-                {/* Pickup Marker */}
-                {pickup && (
-                    <Marker position={pickup}>
-                        <Popup>Pickup: {addressNames.pickup || "Loading..."}</Popup>
-                    </Marker>
-                )}
-                
-                {/* Dropoff Marker */}
-                {dropoff && (
-                    <Marker position={dropoff}>
-                        <Popup>Dropoff: {addressNames.dropoff || "Loading..."}</Popup>
-                    </Marker>
-                )}
-
-                {/* REAL DRIVING ROUTE (Blue Line) */}
+                {pickup && <Marker position={pickup}><Popup>Pickup: {addressNames.pickup}</Popup></Marker>}
+                {dropoff && <Marker position={dropoff}><Popup>Dropoff: {addressNames.dropoff}</Popup></Marker>}
                 {routePath.length > 0 && <Polyline positions={routePath} color="#3b82f6" weight={5} opacity={0.8} />}
-             
              </MapContainer>
              
-             {/* Map Instructions Overlay */}
              <div className="absolute top-4 right-4 z-[1000] bg-black/90 p-4 rounded-lg text-sm border border-white/20 text-right shadow-xl">
                 <p className="font-bold mb-2 uppercase tracking-widest text-gray-500 text-[10px]">Trip Planner</p>
                 <div className="space-y-2">
-                    <p className={pickup ? "text-green-400" : "text-gray-400"}>
-                        {pickup ? "✅ Pickup Set" : "1. Click Map for Pickup"}
-                    </p>
-                    <p className={dropoff ? "text-red-400" : "text-gray-400"}>
-                        {dropoff ? "✅ Dropoff Set" : "2. Click Map for Dropoff"}
-                    </p>
+                    <p className={pickup ? "text-green-400" : "text-gray-400"}>{pickup ? "✅ Pickup Set" : "1. Click Map for Pickup"}</p>
+                    <p className={dropoff ? "text-red-400" : "text-gray-400"}>{dropoff ? "✅ Dropoff Set" : "2. Click Map for Dropoff"}</p>
                 </div>
-                {isLoadingRoute && <p className="text-blue-400 mt-2 text-xs animate-pulse">Calculating Route...</p>}
+                {isLoadingRoute && <p className="text-blue-400 mt-2 text-xs animate-pulse">Calculating...</p>}
              </div>
            </div>
 
-           {/* Selected Addresses Display */}
            {(addressNames.pickup || addressNames.dropoff) && (
                <div className="bg-dark p-4 rounded-lg border border-white/10 flex flex-col gap-2 text-sm">
                    {addressNames.pickup && <p><span className="text-green-400 font-bold">FROM:</span> {addressNames.pickup}</p>}
@@ -218,19 +188,32 @@ export default function Checkout({ cars, user }) {
           </div>
 
           <div className="space-y-4 bg-black/30 p-4 rounded-lg mb-6">
-             <div className="flex justify-between text-sm"><span className="text-gray">Driver Labor ({days} days)</span><span>₹{driverCost}</span></div>
+             <div className="flex justify-between text-sm">
+                <span className="text-gray">Driver Labor ({days} days)</span>
+                <span className={discountAmount > 0 ? "line-through text-gray-500" : ""}>₹{baseDriverCost}</span>
+             </div>
+
+             {/* UPDATED: DISCOUNT ROW */}
+             {discountAmount > 0 && (
+               <div className="flex justify-between text-sm text-green-400 font-bold">
+                  <span>Multi-day Discount ({discountPercentage * 100}%)</span>
+                  <span>- ₹{discountAmount}</span>
+               </div>
+             )}
              
              <div className="flex justify-between text-sm">
                  <span className="text-gray">Fuel Charge ({distanceKm} km)</span>
                  <span>₹{Math.floor(companyCost)}</span>
              </div>
-             {distanceKm > 0 && <p className="text-[10px] text-gray-500 text-right mt-[-8px]">Based on actual driving distance</p>}
 
-             <div className="border-t border-white/10 pt-3 flex justify-between font-bold text-xl"><span>Total</span><span>₹{Math.floor(totalCost)}</span></div>
+             <div className="border-t border-white/10 pt-3 flex justify-between font-bold text-xl">
+                <span>Total</span>
+                <span>₹{Math.floor(totalCost)}</span>
+             </div>
           </div>
 
-          <button onClick={handleConfirm} disabled={isProcessing} className={`w-full font-bold py-4 rounded-lg mt-2 transition ${isProcessing ? 'bg-gray-500 cursor-not-allowed' : 'bg-white text-black hover:bg-gray-200'}`}>
-            {isProcessing ? 'Processing...' : `Pay ₹${Math.floor(totalCost)}`}
+          <button onClick={handleConfirm} disabled={isProcessing} className="w-full bg-white text-black font-bold py-4 rounded-lg mt-2 hover:bg-gray-200 transition">
+            Pay ₹{Math.floor(totalCost)}
           </button>
         </div>
 
