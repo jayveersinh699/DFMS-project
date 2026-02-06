@@ -7,7 +7,30 @@ export default function OwnerDashboard({ user, cars, addCar }) {
   const [activeTab, setActiveTab] = useState('fleet');
   const [requests, setRequests] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
+  
+  // QR Code State
   const [qrCode, setQrCode] = useState(user?.qrCode || null);
+  
+  // Image Preview State
+  const [imagePreview, setImagePreview] = useState(null);
+  
+  const [formData, setFormData] = useState({ 
+    brand: '', name: '', type: 'Sedan', price: '', pricePerKm: '', fuel: 'Petrol', carNumber: '', photo: null 
+  });
+
+  const fetchRequests = useCallback(async () => {
+    if(!user?._id) return;
+    try {
+        const res = await fetch(`http://localhost:5000/api/bookings/${user._id}`);
+        const data = await res.json();
+        const myRequests = data.filter(b => String(b.ownerId) === String(user._id));
+        setRequests(myRequests);
+    } catch(e) { console.error("Error fetching requests"); }
+  }, [user]);
+
+  useEffect(() => {
+    fetchRequests();
+  }, [fetchRequests]);
 
   const handleQrUpload = async (e) => {
     const file = e.target.files[0];
@@ -29,33 +52,12 @@ export default function OwnerDashboard({ user, cars, addCar }) {
       }
     } catch (e) { toast.error("Upload failed", { id: toastId }); }
   };
-  // NEW: State for image preview
-  const [imagePreview, setImagePreview] = useState(null);
-  
-  const [formData, setFormData] = useState({ 
-    brand: '', name: '', type: 'Sedan', price: '', pricePerKm: '', fuel: 'Petrol', carNumber: '', photo: null 
-  });
 
-  const fetchRequests = useCallback(async () => {
-    if(!user?._id) return;
-    try {
-        const res = await fetch(`http://localhost:5000/api/bookings/${user._id}`);
-        const data = await res.json();
-        const myRequests = data.filter(b => String(b.ownerId) === String(user._id));
-        setRequests(myRequests);
-    } catch(e) { console.error("Error fetching requests"); }
-  }, [user]);
-
-  useEffect(() => {
-    fetchRequests();
-  }, [fetchRequests]);
-
-  // NEW: Handle photo selection and preview
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setFormData({ ...formData, photo: file });
-      setImagePreview(URL.createObjectURL(file)); // Create local URL for preview
+      setImagePreview(URL.createObjectURL(file));
     }
   };
 
@@ -112,7 +114,7 @@ export default function OwnerDashboard({ user, cars, addCar }) {
     e.preventDefault();
     addCar({ ...formData, ownerId: user._id, ownerName: user.name });
     setFormData({ ...formData, brand: '', name: '', carNumber: '', photo: null });
-    setImagePreview(null); // Clear preview after submit
+    setImagePreview(null);
     toast.success("Car added successfully!");
   };
 
@@ -140,49 +142,54 @@ export default function OwnerDashboard({ user, cars, addCar }) {
 
         {activeTab === 'fleet' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            <div className="bg-zinc-900 p-8 rounded-xl border border-white/10 h-fit">
-                <h2 className="text-2xl font-bold mb-6">List a Vehicle</h2>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                      <input placeholder="Brand" required className="bg-black border border-white/20 text-white p-3 rounded-lg" onChange={e => setFormData({...formData, brand: e.target.value})} value={formData.brand} />
-                      <input placeholder="Model" required className="bg-black border border-white/20 text-white p-3 rounded-lg" onChange={e => setFormData({...formData, name: e.target.value})} value={formData.name} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                      <select className="bg-black border border-white/20 text-white p-3 rounded-lg" onChange={e => setFormData({...formData, type: e.target.value})}>
-                        <option>Sedan</option><option>SUV</option><option>Luxury</option>
-                      </select>
-                      <select className="bg-black border border-white/20 text-white p-3 rounded-lg" onChange={e => setFormData({...formData, fuel: e.target.value})}>
-                        <option>Petrol</option><option>Diesel</option><option>Electric</option>
-                      </select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                      <input type="number" placeholder="Daily Labor (₹)" required className="bg-black border border-white/20 text-white p-3 rounded-lg" onChange={e => setFormData({...formData, price: e.target.value})} />
-                      <input type="number" placeholder="Fuel Charge (₹/km)" required className="bg-black border border-white/20 text-white p-3 rounded-lg" onChange={e => setFormData({...formData, pricePerKm: e.target.value})} />
-                  </div>
-                  <input placeholder="Car Number" required className="w-full bg-black border border-white/20 text-white p-3 rounded-lg" onChange={e => setFormData({...formData, carNumber: e.target.value})} value={formData.carNumber} />
-                  
-                  {/* UPDATED: Photo Upload with Preview */}
-                  <div className="border-2 border-dashed border-white/20 p-6 rounded-lg text-center cursor-pointer hover:border-white transition relative h-40 flex items-center justify-center overflow-hidden">
-                      <input type="file" required={!imagePreview} className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={handlePhotoChange} />
-                      {imagePreview ? (
-                        <img src={imagePreview} className="absolute inset-0 w-full h-full object-cover" alt="Preview" />
-                      ) : (
-                        <div className="flex flex-col items-center gap-2 text-gray-400">
-                          <Upload size={24} />
-                          <p>Click to upload car photo</p>
-                        </div>
-                      )}
-                  </div>
+            
+            {/* LEFT COLUMN: Forms */}
+            <div className="space-y-8">
+                {/* 1. List Vehicle Form */}
+                <div className="bg-zinc-900 p-8 rounded-xl border border-white/10">
+                    <h2 className="text-2xl font-bold mb-6">List a Vehicle</h2>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                          <input placeholder="Brand" required className="bg-black border border-white/20 text-white p-3 rounded-lg" onChange={e => setFormData({...formData, brand: e.target.value})} value={formData.brand} />
+                          <input placeholder="Model" required className="bg-black border border-white/20 text-white p-3 rounded-lg" onChange={e => setFormData({...formData, name: e.target.value})} value={formData.name} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <select className="bg-black border border-white/20 text-white p-3 rounded-lg" onChange={e => setFormData({...formData, type: e.target.value})}>
+                            <option>Sedan</option><option>SUV</option><option>Luxury</option>
+                          </select>
+                          <select className="bg-black border border-white/20 text-white p-3 rounded-lg" onChange={e => setFormData({...formData, fuel: e.target.value})}>
+                            <option>Petrol</option><option>Diesel</option><option>Electric</option>
+                          </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <input type="number" placeholder="Daily Labor (₹)" required className="bg-black border border-white/20 text-white p-3 rounded-lg" onChange={e => setFormData({...formData, price: e.target.value})} />
+                          <input type="number" placeholder="Fuel Charge (₹/km)" required className="bg-black border border-white/20 text-white p-3 rounded-lg" onChange={e => setFormData({...formData, pricePerKm: e.target.value})} />
+                      </div>
+                      <input placeholder="Car Number" required className="w-full bg-black border border-white/20 text-white p-3 rounded-lg" onChange={e => setFormData({...formData, carNumber: e.target.value})} value={formData.carNumber} />
+                      
+                      <div className="border-2 border-dashed border-white/20 p-6 rounded-lg text-center cursor-pointer hover:border-white transition relative h-40 flex items-center justify-center overflow-hidden">
+                          <input type="file" required={!imagePreview} className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={handlePhotoChange} />
+                          {imagePreview ? (
+                            <img src={imagePreview} className="absolute inset-0 w-full h-full object-cover" alt="Preview" />
+                          ) : (
+                            <div className="flex flex-col items-center gap-2 text-gray-400">
+                              <Upload size={24} />
+                              <p>Click to upload car photo</p>
+                            </div>
+                          )}
+                      </div>
 
-                  <button className="w-full bg-white text-black font-bold py-4 rounded-lg hover:bg-gray-200 transition">List Vehicle</button>
-                </form>
-            </div>
-<div className="bg-zinc-900 p-8 rounded-xl border border-white/10">
+                      <button className="w-full bg-white text-black font-bold py-4 rounded-lg hover:bg-gray-200 transition">List Vehicle</button>
+                    </form>
+                </div>
+
+                {/* 2. QR Code Upload */}
+                <div className="bg-zinc-900 p-8 rounded-xl border border-white/10">
                    <h2 className="text-xl font-bold mb-4">Payment QR Code</h2>
                    <p className="text-gray-400 text-sm mb-4">Upload your UPI QR code so renters can pay you directly via the platform.</p>
                    <div className="flex items-center gap-6">
                       <div className="w-32 h-32 bg-black border border-white/10 rounded-lg flex items-center justify-center overflow-hidden">
-                        {qrCode ? <img src={qrCode} className="w-full h-full object-contain" /> : <span className="text-xs text-gray-500">No QR</span>}
+                        {qrCode ? <img src={qrCode} className="w-full h-full object-contain" alt="QR Code" /> : <span className="text-xs text-gray-500">No QR</span>}
                       </div>
                       <input type="file" id="qrInput" hidden onChange={handleQrUpload} />
                       <button onClick={() => document.getElementById('qrInput').click()} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg font-bold transition">
@@ -190,12 +197,13 @@ export default function OwnerDashboard({ user, cars, addCar }) {
                       </button>
                    </div>
                 </div>
-        
+            </div>
+
+            {/* RIGHT COLUMN: Active Vehicles */}
             <div className="space-y-4">
                 <h2 className="text-2xl font-bold mb-4">Your Active Vehicles</h2>
                 {cars.filter(c => String(c.ownerId) === String(user._id)).map(car => (
                 <div key={car._id} className="flex gap-4 bg-zinc-900 p-4 rounded-xl border border-white/10 items-center">
-                    {/* UPDATED: Show car photo from database */}
                     {car.photo ? (
                         <img src={car.photo} className="w-24 h-24 object-cover rounded-lg" alt={car.name} />
                     ) : (
@@ -214,7 +222,7 @@ export default function OwnerDashboard({ user, cars, addCar }) {
             </div>
             </div>
         )}
-        {/* ... Rest of the component (requests tab, etc.) remains same */}
+
         {activeTab === 'requests' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {requests.map(req => (

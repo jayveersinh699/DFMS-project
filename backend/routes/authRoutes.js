@@ -2,11 +2,14 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const multer = require('multer');
+
+// Image Upload Setup for QR Codes
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
   filename: (req, file, cb) => cb(null, 'qr-' + Date.now() + '-' + file.originalname),
 });
 const upload = multer({ storage });
+
 // REGISTER
 router.post('/register', async (req, res) => {
   try {
@@ -27,11 +30,9 @@ router.post('/register', async (req, res) => {
   }
 });
 
-
 // LOGIN (NOW WITH STRICT ROLE CHECK)
 router.post('/login', async (req, res) => {
   try {
-    // We now extract 'role' from the request too
     const { email, password, role } = req.body;
 
     // 1. SECURE ADMIN CHECK
@@ -49,8 +50,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // 3. FIX: STRICT ROLE CHECK
-    // If the user selects "Rider" but their account is "Driver" (owner), BLOCK THEM.
+    // 3. STRICT ROLE CHECK
     if (role && user.role !== role) {
         const correctRole = user.role === 'owner' ? 'Driver' : 'Rider';
         return res.status(403).json({ 
@@ -63,6 +63,16 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// NEW: GET USER DETAILS (Required for Payment Page to fetch Owner's QR)
+router.get('/user/:id', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        res.json(user);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// UPDATE QR CODE
 router.put('/update-qr/:id', upload.single('qrCode'), async (req, res) => {
     try {
         const qrUrl = `http://localhost:5000/uploads/${req.file.filename}`;
